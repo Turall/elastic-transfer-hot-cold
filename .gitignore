@@ -1,0 +1,9 @@
+/.idea/
+/.venv/
+/.venv1/
+__pycache__
+.coverage
+.DS_Store
+.vscode
+.\#*
+CHANGELOG.md
