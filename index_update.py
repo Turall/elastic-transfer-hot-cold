@@ -169,7 +169,7 @@ async def check_cold_tier_limits(hot_index_sizes: float):
     if sum_of_with_hot_tier <= LIMITS.COLD_TIER_SIZE_LIMIT:
         return True
     diff = sum_of_with_hot_tier - cold_index_size
-    return await check_and_remove_cold_indexes(diff)
+    return True# return await check_and_remove_cold_indexes(diff)
 
 
 async def main():
@@ -183,10 +183,8 @@ async def main():
     if transfer_hot_indexes:
         hot_index_size = calculate_tier_size(transfer_hot_indexes)
         if transfer_hot_indexes and await check_cold_tier_limits(hot_index_size):
-            print(transfer_hot_indexes)
-            print(await check_cold_tier_limits(hot_index_size))
             await transfer_index_from_hot_to_cold(transfer_hot_indexes)
-            print("Success!")
+            print(f"Success! {len(transfer_hot_indexes)} indices is transferred")
             return
     print("Transferable indexes not found!")
 
