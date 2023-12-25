@@ -20,8 +20,8 @@ INDICES = dict()
 
 
 class LIMITS(float, Enum):
-    HOT_TIER_SIZE_LIMIT = 600.0
-    COLD_TIER_SIZE_LIMIT = 1200.0
+    HOT_TIER_SIZE_LIMIT = 200.0
+    COLD_TIER_SIZE_LIMIT = 1000.0
     HOT_INDEX_SIZE_LIMIT = 100
 
 
@@ -44,6 +44,12 @@ def convert_size_to_bytes(size):
         return int(size)
     except ValueError:
         print("Malformed input!")
+
+async def delete_temp_indexes(patterns: list[str]):
+    for i in patterns:
+        indices = await es.indices.get(index=i)
+        for index in indices:
+            await es.indices.delete(index=index)
 
 
 async def get_index_details():
@@ -123,14 +129,16 @@ async def update_index_settings(index_name: str):
 
 def get_transferable_hot_indexes():
     size = 0
+    size_in_gb = 0
     index_count = 0
     for i in HOT_TIER:
         size += i["size"]
         index_count += 1
-        size = convert_byte_to_gb(size)
+        size_in_gb = convert_byte_to_gb(size)
+
         if (
-            size > LIMITS.HOT_INDEX_SIZE_LIMIT
-            and (size - LIMITS.HOT_INDEX_SIZE_LIMIT) > 50
+            size_in_gb > LIMITS.HOT_INDEX_SIZE_LIMIT
+            and (size_in_gb - LIMITS.HOT_INDEX_SIZE_LIMIT) > 50
         ):
             break
 
@@ -147,14 +155,17 @@ async def transfer_index_from_hot_to_cold(hot_indexes_for_transfer: list[dict]):
 async def check_and_remove_cold_indexes(index_size: float):
     print("START check_and_remove_cold_indexes -> ", index_size)
     removable_indexes = []
-    size_ = 0
-    for i in parse_index_sizes(COLD_TIER):
-        size_ += i
-        if size_ > index_size:
-            removable_indexes.append(COLD_TIER.pop(0)[0])
+    size = 0
+    size_in_gb = 0
+    index_count = 0
+    for i in COLD_TIER:
+        size += i["size"]
+        index_count += 1
+        size_in_gb = convert_byte_to_gb(size)
+        if size_in_gb > index_size:
+            removable_indexes.append(i["index_name"])
             break
-        removable_indexes.append(COLD_TIER.pop(0)[0])
-    print("removable_indexes -> ", removable_indexes)
+        removable_indexes.append(i["index_name"])
     if removable_indexes:
         for i in removable_indexes:
             await es.indices.delete(index=i)
@@ -169,23 +180,26 @@ async def check_cold_tier_limits(hot_index_sizes: float):
     if sum_of_with_hot_tier <= LIMITS.COLD_TIER_SIZE_LIMIT:
         return True
     diff = sum_of_with_hot_tier - cold_index_size
-    return True# return await check_and_remove_cold_indexes(diff)
+    return await check_and_remove_cold_indexes(diff)
 
 
 async def main():
-    await get_index_details()
-    await get_indexes_sizes()
-    indexes = build_index_data()
-    await split_hot_cold_indexes(indexes)
-    print(calculate_tier_size(HOT_TIER))
-    print(calculate_tier_size(COLD_TIER))
-    transfer_hot_indexes = get_transferable_hot_indexes()
-    if transfer_hot_indexes:
-        hot_index_size = calculate_tier_size(transfer_hot_indexes)
-        if transfer_hot_indexes and await check_cold_tier_limits(hot_index_size):
-            await transfer_index_from_hot_to_cold(transfer_hot_indexes)
-            print(f"Success! {len(transfer_hot_indexes)} indices is transferred")
-            return
+    remove_patterns = ["logstash-dmz-kube-system-*","logstash-aws-kube-system-*","logstash-cde-kube-system-*","logstash-aws-linkerd-*","logstash-cde-linkerd-*","logstash-dmz-linkerd-*","logstash-aws-openapi-*","logstash-dmz-openapi-*"]
+    await delete_temp_indexes(remove_patterns)
+    # await get_index_details()
+    # await get_indexes_sizes()
+    # indexes = build_index_data()
+    # await split_hot_cold_indexes(indexes)
+    # print(calculate_tier_size(HOT_TIER))
+    # print(calculate_tier_size(COLD_TIER))
+    # transfer_hot_indexes = get_transferable_hot_indexes()
+    # if transfer_hot_indexes:
+    #     hot_index_size = calculate_tier_size(transfer_hot_indexes)
+    #     print(hot_index_size)
+    #     if transfer_hot_indexes and await check_cold_tier_limits(hot_index_size):
+    #         await transfer_index_from_hot_to_cold(transfer_hot_indexes)
+    #         print(f"Success! {len(transfer_hot_indexes)} indices is transferred")
+    #         return
     print("Transferable indexes not found!")
 
 
@@ -194,3 +208,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     finally:
         print(asyncio.run(es.close()))
+
