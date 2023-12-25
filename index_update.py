@@ -186,20 +186,20 @@ async def check_cold_tier_limits(hot_index_sizes: float):
 async def main():
     remove_patterns = ["logstash-dmz-kube-system-*","logstash-aws-kube-system-*","logstash-cde-kube-system-*","logstash-aws-linkerd-*","logstash-cde-linkerd-*","logstash-dmz-linkerd-*","logstash-aws-openapi-*","logstash-dmz-openapi-*"]
     await delete_temp_indexes(remove_patterns)
-    # await get_index_details()
-    # await get_indexes_sizes()
-    # indexes = build_index_data()
-    # await split_hot_cold_indexes(indexes)
-    # print(calculate_tier_size(HOT_TIER))
-    # print(calculate_tier_size(COLD_TIER))
-    # transfer_hot_indexes = get_transferable_hot_indexes()
-    # if transfer_hot_indexes:
-    #     hot_index_size = calculate_tier_size(transfer_hot_indexes)
-    #     print(hot_index_size)
-    #     if transfer_hot_indexes and await check_cold_tier_limits(hot_index_size):
-    #         await transfer_index_from_hot_to_cold(transfer_hot_indexes)
-    #         print(f"Success! {len(transfer_hot_indexes)} indices is transferred")
-    #         return
+    await get_index_details()
+    await get_indexes_sizes()
+    indexes = build_index_data()
+    await split_hot_cold_indexes(indexes)
+    print(calculate_tier_size(HOT_TIER))
+    print(calculate_tier_size(COLD_TIER))
+    transfer_hot_indexes = get_transferable_hot_indexes()
+    if transfer_hot_indexes:
+        hot_index_size = calculate_tier_size(transfer_hot_indexes)
+        print(hot_index_size)
+        if transfer_hot_indexes and await check_cold_tier_limits(hot_index_size):
+            await transfer_index_from_hot_to_cold(transfer_hot_indexes)
+            print(f"Success! {len(transfer_hot_indexes)} indices is transferred")
+            return
     print("Transferable indexes not found!")
 
 
